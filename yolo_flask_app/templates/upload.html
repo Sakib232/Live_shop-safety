@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Image - YOLOv8 Owner Detection</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Back to Home</a>
+
+        <div class="header">
+            <h1>📤 Upload Image for Detection</h1>
+        </div>
+
+        <div class="upload-section">
+            <form id="uploadForm">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📁</div>
+                    <h3>Drag and drop image here</h3>
+                    <p>or</p>
+                    <input type="file" id="fileInput" accept=".jpg,.jpeg,.png" style="display: none;">
+                    <button type="button" class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                        Select File
+                    </button>
+                    <p class="upload-hint">Supported: JPG, PNG (Max 10MB)</p>
+                </div>
+            </form>
+        </div>
+
+        <div id="results" class="results-section" style="display: none;">
+            <div class="result-header">
+                <h2>Detection Results</h2>
+                <div id="statusBadge" class="status-badge"></div>
+            </div>
+
+            <div class="results-content">
+                <div class="image-container">
+                    <h3>Original Image</h3>
+                    <img id="originalImage" src="" alt="Original">
+                </div>
+
+                <div class="image-container">
+                    <h3>Detection Result</h3>
+                    <img id="annotatedImage" src="" alt="Annotated">
+                </div>
+            </div>
+
+            <div class="detection-info">
+                <h3>Detection Information</h3>
+                <table>
+                    <tr>
+                        <td>Status:</td>
+                        <td id="detectionStatus"></td>
+                    </tr>
+                    <tr>
+                        <td>Confidence:</td>
+                        <td id="confidence"></td>
+                    </tr>
+                    <tr>
+                        <td>Objects Detected:</td>
+                        <td id="objectCount"></td>
+                    </tr>
+                </table>
+            </div>
+
+            <button type="button" class="btn btn-secondary" onclick="resetUpload()">Upload Another Image</button>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Processing image...</p>
+        </div>
+
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const uploadArea = document.getElementById('uploadArea');
+        const results = document.getElementById('results');
+        const loading = document.getElementById('loading');
+        const errorMessage = document.getElementById('errorMessage');
+
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                uploadFile();
+            }
+        });
+
+        fileInput.addEventListener('change', uploadFile);
+
+        function uploadFile() {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            // Validate file
+            const allowedTypes = ['image/jpeg', 'image/png'];
+            if (!allowedTypes.includes(file.type)) {
+                showError('File type not allowed. Use JPG or PNG.');
+                return;
+            }
+
+            if (file.size > 10 * 1024 * 1024) {
+                showError('File too large. Max 10MB.');
+                return;
+            }
+
+            // Show loading
+            loading.style.display = 'flex';
+            results.style.display = 'none';
+            errorMessage.style.display = 'none';
+
+            // Upload file
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                loading.style.display = 'none';
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    displayResults(data);
+                }
+            })
+            .catch(error => {
+                loading.style.display = 'none';
+                showError('Error uploading file: ' + error.message);
+            });
+        }
+
+        function displayResults(data) {
+            const isOwner = data.is_owner;
+            
+            // Update images
+            document.getElementById('originalImage').src = data.original_image + '?' + new Date().getTime();
+            document.getElementById('annotatedImage').src = data.annotated_image + '?' + new Date().getTime();
+
+            // Update detection info
+            const statusBadge = document.getElementById('statusBadge');
+            const detectionStatus = document.getElementById('detectionStatus');
+            
+            if (isOwner) {
+                statusBadge.className = 'status-badge status-owner';
+                statusBadge.textContent = 'OWNER DETECTED ✓';
+                detectionStatus.textContent = 'OWNER DETECTED';
+                detectionStatus.style.color = '#27ae60';
+            } else {
+                statusBadge.className = 'status-badge status-unknown';
+                statusBadge.textContent = 'NOT OWNER ⚠';
+                detectionStatus.textContent = 'NOT OWNER (Alert sent)';
+                detectionStatus.style.color = '#e74c3c';
+            }
+
+            document.getElementById('confidence').textContent = (data.confidence * 100).toFixed(2) + '%';
+            document.getElementById('objectCount').textContent = data.detections.length;
+
+            results.style.display = 'block';
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+
+        function resetUpload() {
+            fileInput.value = '';
+            results.style.display = 'none';
+            errorMessage.style.display = 'none';
+            loading.style.display = 'none';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Webcam - Shop Security</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .shop-status-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            color: white;
+            z-index: 100;
+        }
+
+        .shop-status-badge.secure {
+            background: #e74c3c;
+        }
+
+        .shop-status-badge.open {
+            background: #27ae60;
+        }
+    </style>
+</head>
+<body>
+    <div class="container live-container">
+        <a href="/" class="back-link">← Back to Home</a>
+
+        <div class="header">
+            <h1>📹 Live Webcam - Shop Security</h1>
+        </div>
+
+        <div id="shopStatusBadge" class="shop-status-badge open">🔓 OPEN</div>
+
+        <div class="live-section">
+            <div class="video-wrapper">
+                <img id="videoFeed" src="/video_feed" alt="Live Video Feed">
+                <div id="statusOverlay" class="status-overlay">
+                    <div id="statusText" class="status-text">Loading...</div>
+                </div>
+            </div>
+
+            <div class="live-info">
+                <h3>Stream Information</h3>
+                <div class="info-item">
+                    <span class="label">Stream Status:</span>
+                    <span id="streamStatus" class="status-indicator">● Streaming</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Shop Status:</span>
+                    <span id="shopModeText" class="status-indicator">● OPEN</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Resolution:</span>
+                    <span>640x480</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Model:</span>
+                    <span>YOLOv8 Person Detection</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Alert Cooldown:</span>
+                    <span>2 minutes between alerts</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="live-controls">
+            <a href="/admin" class="btn btn-primary" style="text-decoration: none; display: inline-block;">
+                ⚙️ Go to Control Panel
+            </a>
+            <button type="button" class="btn btn-secondary" onclick="window.location.href='/'">
+                🏠 Go to Home
+            </button>
+        </div>
+
+        
+    </div>
+
+    <script>
+        // Update shop status
+        function updateShopStatus() {
+            fetch('/api/shop/status')
+                .then(response => response.json())
+                .then(data => {
+                    const badge = document.getElementById('shopStatusBadge');
+                    const statusText = document.getElementById('shopModeText');
+                    
+                    if (data.is_on) {
+                        badge.className = 'shop-status-badge secure';
+                        badge.textContent = '🔒 CLOSED';
+                        statusText.textContent = '🔒 CLOSED - Security ON';
+                        statusText.style.color = '#e74c3c';
+                    } else {
+                        badge.className = 'shop-status-badge open';
+                        badge.textContent = '🔓 OPEN';
+                        statusText.textContent = '🔓 OPEN - Security OFF';
+                        statusText.style.color = '#27ae60';
+                    }
+                });
+        }
+
+        // The video feed is an MJPEG stream, so the img tag will continuously update
+        document.getElementById('videoFeed').onload = function() {
+            document.getElementById('streamStatus').innerHTML = '● Streaming';
+            document.getElementById('streamStatus').style.color = '#27ae60';
+        };
+
+        document.getElementById('videoFeed').onerror = function() {
+            document.getElementById('streamStatus').innerHTML = '● Connection lost';
+            document.getElementById('streamStatus').style.color = '#e74c3c';
+        };
+
+        // Auto-reload feed on error
+        let errorCount = 0;
+        document.getElementById('videoFeed').addEventListener('error', function() {
+            errorCount++;
+            if (errorCount > 3) {
+                console.log('Video feed error, attempting to reconnect...');
+                this.src = '/video_feed?' + new Date().getTime();
+                errorCount = 0;
+            }
+        });
+
+        // Initial status update and auto-refresh
+        updateShopStatus();
+        setInterval(updateShopStatus, 3000);
+    </script>
+</body>
+</html>
